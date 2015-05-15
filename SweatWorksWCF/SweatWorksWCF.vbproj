@@ -127,9 +127,19 @@
     <Content Include="Web.config" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DataContracts\dcGymClassResponse.vb" />
+    <Compile Include="DataContracts\dcGymDetailsResponse.vb" />
+    <Compile Include="DataContracts\dcAmenityResponse.vb" />
+    <Compile Include="DataContracts\dcGymWebLinkResponse.vb" />
+    <Compile Include="DataContracts\dcGymPhotoResponse.vb" />
+    <Compile Include="DataContracts\dcUserPrefAmenityRequest.vb" />
+    <Compile Include="DataContracts\dcUserPrefsRequest.vb" />
+    <Compile Include="DataContracts\dcGymSearchRequest.vb" />
     <Compile Include="DataContracts\dcLoginRequest.vb" />
     <Compile Include="DataContracts\dcRegistrationRequest.vb" />
     <Compile Include="DataContracts\dcOperationStatus.vb" />
+    <Compile Include="DataContracts\dcGymsResponse.vb" />
+    <Compile Include="DataContracts\dcGymResponse.vb" />
     <Compile Include="DataContracts\dcUserResponse.vb" />
     <Compile Include="Service1.svc.vb">
       <DependentUpon>Service1.svc</DependentUpon>

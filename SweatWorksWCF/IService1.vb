@@ -15,6 +15,20 @@ Public Interface IService1
     <WebInvoke(Method:="POST", UriTemplate:="register", RequestFormat:=WebMessageFormat.Json, responseformat:=WebMessageFormat.Json, BodyStyle:=WebMessageBodyStyle.Bare)> _
     Function Register(ByVal thisRequest As dcRegistrationRequest) As dcUserResponse
 
+    <OperationContract()> _
+    <WebInvoke(Method:="POST", UriTemplate:="prefs/insert", RequestFormat:=WebMessageFormat.Json, responseformat:=WebMessageFormat.Json, BodyStyle:=WebMessageBodyStyle.Bare)> _
+    Function InsertUserPrefs(ByVal thisRequest As dcUserPrefsRequest) As dcOperationStatus
+
+
+    'GYMS----------------------------------------------------------------------------------
+    <OperationContract()> _
+    <WebGet(UriTemplate:="gym/details/{strGymID}", responseformat:=WebMessageFormat.Json)> _
+    Function GetGymDetails(ByVal strGymID As String) As dcGymDetailsResponse
+
+    <OperationContract()> _
+    <WebInvoke(Method:="POST", UriTemplate:="gyms/search", RequestFormat:=WebMessageFormat.Json, responseformat:=WebMessageFormat.Json, BodyStyle:=WebMessageBodyStyle.Bare)> _
+    Function SearchGyms(ByVal thisRequest As dcGymSearchRequest) As dcGymsResponse
+
 
 
 End Interface
