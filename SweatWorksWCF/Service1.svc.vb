@@ -7,6 +7,7 @@ Public Class Service1
     Implements IService1
 
     Private intAppID As Integer = 2
+
     Public Sub New()
     End Sub
 
@@ -41,7 +42,9 @@ Public Class Service1
                                 LogError(ex, "Login Error: error saving user activity during login.", intAppID, Now)
                             End Try
                             'success
-                            Return New dcUserResponse(thisUser)
+                            Dim thisDCUser As New dcUserResponse(thisUser)
+                            thisDCUser.CompanyName = thisUser.Company.CompanyName
+                            Return thisDCUser
                         Else
                             status = Net.HttpStatusCode.BadRequest
                             LogError("Login Error: wrong password.  strEmail: " + strEmail + " strPassword: " + strPassword, intAppID, Now)
@@ -77,6 +80,7 @@ Public Class Service1
         Dim boolCheckedConsent As Boolean = Nothing
         Dim boolOptedIn As Boolean = Nothing
         Dim boolAcceptedTerms As Boolean = Nothing
+        Dim sbStatusMessage As New StringBuilder
 
         Try
             'VALIDATE
@@ -104,13 +108,22 @@ Public Class Service1
                 Else
                     Dim newUser As New User With {.FirstName = thisRequest.FirstName, .LastName = thisRequest.LastName, .Email = thisRequest.Email, .DateCreated = Now, .UserTypeID = 1} 'usertype: user
                     newUser.PasswordHash = HashTools.CreateHash(thisRequest.Password)
+                    If Not thisRequest.EmployerCode = Nothing Then
+                        Dim existingCompany As Company = (From c In db.Companys Where c.EmployerCode = thisRequest.EmployerCode).FirstOrDefault
+                        If Not existingCompany Is Nothing Then
+                            newUser.CompanyID = existingCompany.CompanyID
+                        Else
+                            sbStatusMessage.Append("Employer Code was invalid.")
+                            LogError("A user registered with a bad employee code: " + thisRequest.EmployerCode + " Email: " + thisRequest.Email, intAppID, Now)
+                        End If
+                    End If
                     db.Users.Add(newUser)
                     db.SaveChanges()
                     userResponse = New dcUserResponse(newUser)
                 End If
 
             End Using
-
+            userResponse.Status.Notes = sbStatusMessage.ToString
             status = Net.HttpStatusCode.Created
         Catch ex As Exception
             status = Net.HttpStatusCode.Conflict
@@ -165,6 +178,92 @@ Public Class Service1
 
     End Function
 
+    Public Function ResetPassword(ByVal thisRequest As dcPasswordResetRequest) As dcOperationStatus Implements IService1.ResetPassword
+        Dim ctx As WebOperationContext = WebOperationContext.Current
+        Dim status As System.Net.HttpStatusCode = System.Net.HttpStatusCode.OK
+
+        Try
+            Using db As New SweatWorksEntities
+                Dim existingUser As User = (From u In db.Users Where u.Email = thisRequest.Email).FirstOrDefault
+                If existingUser Is Nothing Then
+                    Return New dcOperationStatus With {.ErrorMessageForUser = "This email is not affililated with an existing account.", .Successful = False}
+                Else
+                    Dim strNewPassword As String = GenerateTempPassword()
+                    existingUser.PasswordHash = HashTools.CreateHash(strNewPassword)
+                    existingUser.IsTempPassword = True
+                    db.SaveChanges()
+                End If
+
+                db.SaveChanges()
+                Return New dcOperationStatus With {.Successful = True}
+            End Using
+        Catch ex As Exception
+            status = Net.HttpStatusCode.Conflict
+            LogError(ex, "ResetPassword Error", intAppID, Now)
+            Return New dcOperationStatus With {.ErrorMessageForUser = "Exception occured during ResetPassword.", .ExMessage = ex.ToString, .Successful = False}
+        Finally
+            ctx.OutgoingResponse.StatusCode = status
+        End Try
+
+    End Function
+
+    Public Function ChangePassword(ByVal thisRequest As dcPasswordChangeRequest) As dcOperationStatus Implements IService1.ChangePassword
+        Dim ctx As WebOperationContext = WebOperationContext.Current
+        Dim status As System.Net.HttpStatusCode = System.Net.HttpStatusCode.OK
+
+        Try
+            Using db As New SweatWorksEntities
+                Dim existingUser As User = (From u In db.Users Where u.Email = thisRequest.UserID).FirstOrDefault
+                If existingUser Is Nothing Then
+                    Return New dcOperationStatus With {.ErrorMessageForUser = "This UserID is not affililated with an existing account.", .Successful = False}
+                Else
+                    If HashTools.ValidatePassword(thisRequest.OldPassword, existingUser.PasswordHash) Then
+                        existingUser.PasswordHash = HashTools.CreateHash(thisRequest.NewPassword)
+                        existingUser.IsTempPassword = False
+                        db.SaveChanges()
+                    Else
+                        status = Net.HttpStatusCode.BadRequest
+                        LogError("ChangePassword Error: OldPassword was incorrect", intAppID, Now)
+                        Return New dcOperationStatus With {.ErrorMessageForUser = "Old password incorrect.", .Successful = False}
+                    End If
+
+                End If
+
+                db.SaveChanges()
+                Return New dcOperationStatus With {.Successful = True, .Notes = "Password Changed."}
+            End Using
+        Catch ex As Exception
+            status = Net.HttpStatusCode.Conflict
+            LogError(ex, "ChangePassword Error", intAppID, Now)
+            Return New dcOperationStatus With {.ErrorMessageForUser = "Exception occured during ChangePassword.", .ExMessage = ex.ToString, .Successful = False}
+        Finally
+            ctx.OutgoingResponse.StatusCode = status
+        End Try
+
+    End Function
+
+    Private Function GenerateTempPassword() As String
+        Dim strCode = Nothing
+
+        Dim alphaLetters() As String = {"A", "a", "B", "b", "1", "C", "c", "2", "D", "d", "3", "E", "e", "4", "F", "f", "5", "G", "g", "6", "H", "h", "7", "i", "8", "J", "j", "9", "K", "k", "L", "M", "m", "N", "n", "P", "p", "V", "v", "W", "w"}
+        Dim alphaCount As Integer = alphaLetters.Length
+
+        For i As Integer = 0 To 6
+            Dim randNumber = GetRandomNumber(0, alphaCount - 1)
+            strCode += alphaLetters(randNumber)
+        Next
+
+        Return "tmp-" + strCode
+    End Function
+
+    Dim objRandom As New System.Random(CType(System.DateTime.Now.Ticks Mod System.Int32.MaxValue, Integer))
+    Public Function GetRandomNumber(Optional ByVal Low As Integer = 1, Optional ByVal High As Integer = 100) As Integer
+        ' Returns a random number,
+        ' between the optional Low and High parameters
+        Return objRandom.Next(Low, High + 1)
+    End Function
+
+
 #End Region
 
 #Region "Gyms"
@@ -211,32 +310,36 @@ Public Class Service1
                     Dim dLat As Double = CDbl(thisRequest.Latitude)
                     Dim dLong As Double = CDbl(thisRequest.Longitude)
                     Dim nearbyGymsResult As ObjectResult(Of GetNearbyGyms_Result) = db.GetNearbyGyms(dLat, dLong, thisRequest.MaxDistanceInMiles)
-                    For Each thisNearResult As GetNearbyGyms_Result In nearbyGymsResult
-                        Dim thisGym As Gym = (From g In db.Gyms Where g.GymID = thisNearResult.GymID).FirstOrDefault
-                        If Not thisGym Is Nothing Then
-                            gyms.Add(thisGym)
-                        End If
-                    Next
+                    If Not nearbyGymsResult Is Nothing Then
+                        gyms = New List(Of Gym)
+                        For Each thisNearResult As GetNearbyGyms_Result In nearbyGymsResult
+                            Dim thisGym As Gym = (From g In db.Gyms Where g.GymID = thisNearResult.GymID).FirstOrDefault
+                            If Not thisGym Is Nothing Then
+                                gyms.Add(thisGym)
+                            End If
+                        Next
+                    End If
+                    
                 ElseIf Not thisRequest.City = Nothing And Not thisRequest.State = Nothing Then
                     'city/state
-                    gyms = (From g In db.Gyms Where g.City = thisRequest.City And g.State = thisRequest.State).ToList
+                    gyms = (From g In db.Gyms Where g.City = thisRequest.City And g.State = thisRequest.State And g.DateDeleted Is Nothing And g.GymAmenitys.Count > 0).ToList
                 ElseIf Not thisRequest.Zip = Nothing Then
                     'zip
-                    gyms = (From g In db.Gyms Where g.Zip = thisRequest.Zip).ToList
+                    gyms = (From g In db.Gyms Where g.Zip = thisRequest.Zip And g.DateDeleted Is Nothing And g.GymAmenitys.Count > 0).ToList
                 End If
 
                 '2. narrow by name, unless location results are empty, then start new search
                 If Not thisRequest.Name = Nothing Then
                     If gyms Is Nothing Then
-                        gyms = (From g In db.Gyms Where g.Name.Contains(thisRequest.Name)).ToList
+                        gyms = (From g In db.Gyms Where g.Name.ToLower.Contains(thisRequest.Name.ToLower) And g.DateDeleted Is Nothing And g.GymAmenitys.Count > 0).ToList
                     Else
-                        gyms = (From g In gyms Where g.Name.Contains(thisRequest.Name)).ToList
+                        gyms = (From g In gyms Where g.Name.ToLower.Contains(thisRequest.Name.ToLower) And g.DateDeleted Is Nothing).ToList
                     End If
                 End If
 
                 'sort gyms by preferences if they exist?
                 If Not thisRequest.UserID = Nothing Then
-                    gyms = (From g In gyms _
+                    gyms = (From g In gyms Where g.DateDeleted Is Nothing _
                         Order By If((From ga In g.GymAmenitys _
                         Join upa In db.UserPrefAmenitys On ga.AmenityID Equals upa.AmenityID _
                         Where upa.UserID = thisRequest.UserID _
@@ -245,15 +348,18 @@ Public Class Service1
                         If((From ga In g.GymClasses _
                         Join upc In db.UserPrefClassCategorys On ga.GymClassCategoryID Equals upc.GymClassCategory.GymClassCategoryID _
                         Where upc.UserID = thisRequest.UserID _
-                        Select CType(upc.ClassCategoryID, Integer?)).FirstOrDefault, 0) Descending).ToList
+                        Select CType(upc.ClassCategoryID, Integer?)).FirstOrDefault, 0) Descending).Take(50).ToList
 
                     
                 End If
-
-                For Each thisGym As Gym In gyms
-                    gymsResponse.Gyms.Add(New dcGymResponse(thisGym))
-                Next
-                gymsResponse.Status = New dcOperationStatus With {.Successful = True}
+                If Not gyms Is Nothing Then
+                    For Each thisGym As Gym In gyms
+                        gymsResponse.Gyms.Add(New dcGymResponse(thisGym))
+                    Next
+                    gymsResponse.Status = New dcOperationStatus With {.Successful = True}
+                Else
+                    gymsResponse.Status = New dcOperationStatus With {.Successful = True, .ErrorMessageForUser = "No gyms found."}
+                End If
             End Using
 
         Catch ex As Exception
@@ -267,9 +373,172 @@ Public Class Service1
         Return gymsResponse
     End Function
 
+    Public Function GetAllCityStates() As List(Of String) Implements IService1.GetAllCityStates
+      Dim ctx As WebOperationContext = WebOperationContext.Current
+        Dim status As System.Net.HttpStatusCode = System.Net.HttpStatusCode.OK
+        Dim thisResponse As New dcGymDetailsResponse
+
+        Try
+            Using db As New SweatWorksEntities
+                Return (From g In db.Gyms Select citystate = g.City + ", " + g.State Distinct Order By citystate).ToList
+            End Using
+        Catch ex As Exception
+            LogError(ex, "Error in GetAllZips.", intAppID, Now)
+            status = Net.HttpStatusCode.Conflict
+            Return Nothing
+        Finally
+            ctx.OutgoingResponse.StatusCode = status
+        End Try
+    End Function
+
+    Public Function GetAllZips() As List(Of String) Implements IService1.GetAllZips
+        Dim ctx As WebOperationContext = WebOperationContext.Current
+        Dim status As System.Net.HttpStatusCode = System.Net.HttpStatusCode.OK
+        Dim thisResponse As New dcGymDetailsResponse
+
+        Try
+            Using db As New SweatWorksEntities
+                Return (From g In db.Gyms Select g.Zip Distinct).ToList
+            End Using
+        Catch ex As Exception
+            LogError(ex, "Error in GetAllZips.", intAppID, Now)
+            status = Net.HttpStatusCode.Conflict
+            Return Nothing
+        Finally
+            ctx.OutgoingResponse.StatusCode = status
+        End Try
+    End Function
+
 #End Region
 
+#Region "Fit Bank - Checkins, Dashboard, etc."
 
+    Public Function InsertCheckin(ByVal thisRequest As dcCheckinInsertRequest) As dcOperationStatus Implements IService1.InsertCheckin
+        Dim ctx As WebOperationContext = WebOperationContext.Current
+        Dim status As System.Net.HttpStatusCode = System.Net.HttpStatusCode.OK
+
+        Try
+            Using db As New SweatWorksEntities
+                Dim newCheckin As New Checkin With {.UserID = thisRequest.UserID, .GymID = thisRequest.GymID}
+                newCheckin.DateCreated = CType(thisRequest.DateCreated, DateTimeOffset).ToString("M-d-yyyy h:mm tt zzz")
+                db.Checkins.Add(newCheckin)
+                db.SaveChanges()
+                Return New dcOperationStatus With {.Successful = True}
+            End Using
+        Catch ex As Exception
+            status = Net.HttpStatusCode.Conflict
+            LogError(ex, "InsertUserPrefs Error", intAppID, Now)
+            Return New dcOperationStatus With {.ErrorMessageForUser = "Exception occured during InsertCheckin.", .ExMessage = ex.ToString, .Successful = False}
+        Finally
+            ctx.OutgoingResponse.StatusCode = status
+        End Try
+
+    End Function
+
+    Public Function GetFitBankDashboard(ByVal strUserID As String) As dcFitBankDashboardResponse Implements IService1.GetFitBankDashboard
+        Dim ctx As WebOperationContext = WebOperationContext.Current
+        Dim status As System.Net.HttpStatusCode = System.Net.HttpStatusCode.OK
+        Dim thisResponse As New dcFitBankDashboardResponse
+
+        If Not IsNumeric(strUserID) Then
+            LogError("Error in GetFitBankDashboard.  Invalid user id: " + strUserID, intAppID, Now)
+            status = Net.HttpStatusCode.BadRequest
+            thisResponse.Status = New dcOperationStatus With {.Successful = False, .Notes = "Error in GetFitBankDashboard.  Invalid user id: " + strUserID}
+            Return thisResponse
+        End If
+
+        Dim intUserID As Integer = CInt(strUserID)
+
+        Try
+            Using db As New SweatWorksEntities
+                Dim thisUser As User = (From u In db.Users Where u.UserID = intUserID).FirstOrDefault
+                If Not thisUser Is Nothing Then
+                    'favorite gyms
+                    Dim results = (From checkins In thisUser.Checkins Group checkins.Gym By checkins.Gym Into favgyms = Group Order By favgyms.Count Descending Select New With {favgyms.Count, Gym.Name, Gym.GymID}).take(3).tolist
+                    For Each thisResult In results
+                        thisResponse.Favorites.Add(New dcGymListing With {.Name = thisResult.Name, .GymID = thisResult.GymID})
+                    Next
+
+                    'recent checkins
+                    Dim recentCheckins As List(Of Checkin) = (From rc In thisUser.Checkins Order By rc.DateCreated Descending).Take(1).ToList
+                    For Each thisCheckin In recentCheckins
+                        Dim thisDCcheckin As dcCheckin = New dcCheckin(thisCheckin)
+                        thisDCcheckin.GymName = thisCheckin.Gym.Name
+                        thisResponse.RecentCheckins.Add(thisDCcheckin)
+                    Next
+
+                    'unredeemed checkins
+                    thisResponse.TotalUnredeemedCheckIns = (From c In thisUser.Checkins Where c.RedeemedReward Is Nothing).Count
+                    'redeemed checkins
+                    thisResponse.TotalRedeemedCheckIns = (From c In thisUser.Checkins Where Not c.RedeemedReward Is Nothing).Count
+                    'total checkins needed for next reward
+                    Dim defaultReward As CompanyReward = thisUser.Company.CompanyRewards.FirstOrDefault()
+                    If Not defaultReward Is Nothing Then
+                        thisResponse.CheckinsUntilNextReward = defaultReward.CheckinsNeeded - thisResponse.TotalUnredeemedCheckIns
+                        thisResponse.RewardCost = defaultReward.CheckinsNeeded
+                    End If
+                    'TODO: deposits?
+                    thisResponse.TotalRedeemedRewards = (From rr In thisUser.RedeemedRewards).Count
+                Else
+                    LogError("Error in GetFitBankDashboard.  User not found.  strUserID: " + strUserID, intAppID, Now)
+                    thisResponse.Status = New dcOperationStatus With {.Successful = False, .Notes = "Error in GetFitBankDashboard.  User not found.  strUserID: " + strUserID}
+                    status = Net.HttpStatusCode.Conflict
+                End If
+            End Using
+        Catch ex As Exception
+            LogError(ex, "Error in GetFitBankDashboard.  strUserID: " + strUserID, intAppID, Now)
+            thisResponse.Status = New dcOperationStatus With {.Successful = False, .Notes = "Error in GetFitBankDashboard.  strUserID: " + strUserID, .ExMessage = ex.Message}
+            status = Net.HttpStatusCode.Conflict
+        Finally
+            ctx.OutgoingResponse.StatusCode = status
+        End Try
+
+        Return thisResponse
+    End Function
+
+    Public Function GetCheckins(ByVal strUserID As String) As dcCheckinsResponse Implements IService1.GetCheckins
+        Dim ctx As WebOperationContext = WebOperationContext.Current
+        Dim status As System.Net.HttpStatusCode = System.Net.HttpStatusCode.OK
+        Dim thisResponse As New dcCheckinsResponse
+
+        If Not IsNumeric(strUserID) Then
+            LogError("Error in GetCheckins.  Invalid user id: " + strUserID, intAppID, Now)
+            status = Net.HttpStatusCode.BadRequest
+            thisResponse.Status = New dcOperationStatus With {.Successful = False, .Notes = "Error in GetCheckins.  Invalid user id: " + strUserID}
+            Return thisResponse
+        End If
+
+        Dim intUserID As Integer = CInt(strUserID)
+
+        Try
+            Using db As New SweatWorksEntities
+                Dim thisUser As User = (From u In db.Users Where u.UserID = intUserID).FirstOrDefault
+                If Not thisUser Is Nothing Then
+                    Dim checkins As List(Of Checkin) = (From c In thisUser.Checkins Order By c.DateCreated Descending).ToList
+                    For Each thisCheckin As Checkin In checkins
+                        Dim thisDCcheckin As dcCheckin = New dcCheckin(thisCheckin)
+                        thisDCcheckin.GymName = thisCheckin.Gym.Name
+                        thisResponse.Checkins.Add(thisDCcheckin)
+                    Next
+                    thisResponse.Status = New dcOperationStatus With {.Successful = True}
+                Else
+                    LogError("Error in GetFitBankDashboard.  User not found.  strUserID: " + strUserID, intAppID, Now)
+                    thisResponse.Status = New dcOperationStatus With {.Successful = False, .Notes = "Error in GetCheckins.  User not found.  strUserID: " + strUserID}
+                    status = Net.HttpStatusCode.Conflict
+                End If
+            End Using
+        Catch ex As Exception
+            LogError(ex, "Error in GetFitBankDashboard.  strUserID: " + strUserID, intAppID, Now)
+            thisResponse.Status = New dcOperationStatus With {.Successful = False, .Notes = "Error in GetCheckins.  strUserID: " + strUserID, .ExMessage = ex.Message}
+            status = Net.HttpStatusCode.Conflict
+        Finally
+            ctx.OutgoingResponse.StatusCode = status
+        End Try
+
+        Return thisResponse
+    End Function
+
+#End Region
 
 
 End Class

@@ -22,6 +22,7 @@
     <IISExpressUseClassicPipelineMode />
     <NuGetPackageImportStamp>468defce</NuGetPackageImportStamp>
     <ApplicationInsightsResourceId>/subscriptions/dd91e45d-87b1-4842-9776-effb9d5ee4ca/resourcegroups/Default-ApplicationInsights-CentralUS/providers/microsoft.insights/components/SweatWorksWCF</ApplicationInsightsResourceId>
+    <UseGlobalApplicationHostFile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -124,12 +125,21 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Service1.svc" />
-    <Content Include="Web.config" />
+    <Content Include="Web.config">
+      <SubType>Designer</SubType>
+    </Content>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DataContracts\dcCheckin.vb" />
+    <Compile Include="DataContracts\dcPasswordChangeRequest.vb" />
+    <Compile Include="DataContracts\dcPasswordResetRequest.vb" />
+    <Compile Include="DataContracts\dcFitBankDashboardResponse.vb" />
     <Compile Include="DataContracts\dcGymClassResponse.vb" />
     <Compile Include="DataContracts\dcGymDetailsResponse.vb" />
     <Compile Include="DataContracts\dcAmenityResponse.vb" />
+    <Compile Include="DataContracts\dcCheckinInsertRequest.vb" />
+    <Compile Include="DataContracts\dcGymListing.vb" />
+    <Compile Include="DataContracts\dcCheckinsResponse.vb" />
     <Compile Include="DataContracts\dcGymWebLinkResponse.vb" />
     <Compile Include="DataContracts\dcGymPhotoResponse.vb" />
     <Compile Include="DataContracts\dcUserPrefAmenityRequest.vb" />
@@ -177,7 +187,8 @@
       <Generator>MyApplicationCodeGenerator</Generator>
       <LastGenOutput>Application.Designer.vb</LastGenOutput>
     </None>
-    <None Include="My Project\PublishProfiles\Default Settings.pubxml" />
+    <None Include="My Project\PublishProfiles\SweatWorksWCF - FTP.pubxml" />
+    <None Include="My Project\PublishProfiles\SweatWorksWCF - Web Deploy.pubxml" />
     <None Include="My Project\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <CustomToolNamespace>My</CustomToolNamespace>
