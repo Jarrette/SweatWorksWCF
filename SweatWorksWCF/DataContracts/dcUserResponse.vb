@@ -12,6 +12,8 @@ Namespace DataContracts
         Private _LastName As String
         Private _UserImageURL As String
         Private _Status As dcOperationStatus
+        Private _CompanyID As Integer
+        Private _CompanyName As String
 
         <DataMember(IsRequired:=True)>
         Public Property UserID() As Integer
@@ -83,6 +85,26 @@ Namespace DataContracts
             End Set
         End Property
 
+        <DataMember(IsRequired:=True)>
+        Public Property CompanyID() As Integer
+            Get
+                Return _CompanyID
+            End Get
+            Set(ByVal value As Integer)
+                _CompanyID = value
+            End Set
+        End Property
+
+        <DataMember(IsRequired:=True)>
+        Public Property CompanyName() As String
+            Get
+                Return _CompanyName
+            End Get
+            Set(ByVal value As String)
+                _CompanyName = value
+            End Set
+        End Property
+
         Public Sub New()
         End Sub
 
@@ -94,6 +116,7 @@ Namespace DataContracts
             _LastName = thisUser.LastName
             _UserImageURL = thisUser.UserImageURL
             _Status = New dcOperationStatus With {.Successful = True, .IdentityID = thisUser.UserID.ToString}
+            _CompanyID = thisUser.CompanyID
         End Sub
     End Class
 

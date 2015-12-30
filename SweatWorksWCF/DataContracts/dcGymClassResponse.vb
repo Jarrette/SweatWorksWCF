@@ -6,6 +6,7 @@ Namespace DataContracts
     <DataContract(Name:="dcGymClassResponse")> _
     Public Class dcGymClassResponse
         Private _GymClassID As Integer
+        Private _Title As String
         Private _Description As String
 
         <DataMember(IsRequired:=True)>
@@ -15,6 +16,16 @@ Namespace DataContracts
             End Get
             Set(ByVal value As Integer)
                 _GymClassID = value
+            End Set
+        End Property
+
+        <DataMember(IsRequired:=True)>
+        Public Property Title() As String
+            Get
+                Return _Title
+            End Get
+            Set(ByVal value As String)
+                _Title = value
             End Set
         End Property
 
@@ -34,6 +45,7 @@ Namespace DataContracts
 
         Public Sub New(ByVal thisGymClass As GymClass)
             _GymClassID = thisGymClass.GymClassID
+            _Title = thisGymClass.Title
             _Description = thisGymClass.Description
         End Sub
 

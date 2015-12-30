@@ -13,6 +13,7 @@ Namespace DataContracts
         Private _CheckedTerms As String
         Private _CheckedConsent As String
         Private _OptedIn As String
+        Private _EmployerCode As String
 
         <DataMember(IsRequired:=True)>
         Public Property FirstName() As String
@@ -91,6 +92,16 @@ Namespace DataContracts
             End Get
             Set(ByVal value As Boolean)
                 _OptedIn = value
+            End Set
+        End Property
+
+        <DataMember(IsRequired:=False)>
+        Public Property EmployerCode() As String
+            Get
+                Return _EmployerCode
+            End Get
+            Set(ByVal value As String)
+                _EmployerCode = value
             End Set
         End Property
 
