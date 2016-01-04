@@ -109,7 +109,7 @@ Namespace DataContracts
         End Sub
 
         Public Overrides Function toString() As String
-            Return "email: " + Email + " First Name: " + FirstName + " Last Name: " + LastName + " password: " + Password + " FacebookID: " + FacebookID
+            Return "email: " + Email + " First Name: " + FirstName + " Last Name: " + LastName + " password: " + Password
         End Function
 
     End Class

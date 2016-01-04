@@ -128,7 +128,7 @@ Public Class Service1
         Catch ex As Exception
             status = Net.HttpStatusCode.Conflict
             LogError(ex, "Registration Error", intAppID, Now)
-            Return New dcUserResponse With {.Status = New dcOperationStatus With {.ErrorMessageForUser = "Exception occured during Registration.", .ExMessage = ex.ToString, .Successful = False}}
+            Return New dcUserResponse With {.Status = New dcOperationStatus With {.ErrorMessageForUser = "Exception occured during Registration.", .ExMessage = ex.ToString, .Successful = False, .Notes = "request: " + thisRequest.toString}}
         Finally
             ctx.OutgoingResponse.StatusCode = status
         End Try
@@ -274,7 +274,7 @@ Public Class Service1
         Dim thisResponse As New dcGymDetailsResponse
 
         If Not IsNumeric(strGymID) Then
-            LogError("Error in GetGymDetails.  Invalid parameter: " + strGymID, intAppID, Now)
+            LogError("Error in GetGymDetails.  Invalid gymID: " + strGymID, intAppID, Now)
             status = Net.HttpStatusCode.BadRequest
             Return Nothing
         End If

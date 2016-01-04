@@ -24,7 +24,7 @@ Public Interface IService1
     Function ResetPassword(ByVal thisRequest As dcPasswordResetRequest) As dcOperationStatus
 
     <OperationContract()>
-    <WebInvoke(Method:="POST", UriTemplate:="prefs/insert", RequestFormat:=WebMessageFormat.Json, ResponseFormat:=WebMessageFormat.Json, BodyStyle:=WebMessageBodyStyle.Bare)>
+    <WebInvoke(Method:="POST", UriTemplate:="password/change", RequestFormat:=WebMessageFormat.Json, ResponseFormat:=WebMessageFormat.Json, BodyStyle:=WebMessageBodyStyle.Bare)>
     Function ChangePassword(ByVal thisRequest As dcPasswordChangeRequest) As dcOperationStatus
 
 
