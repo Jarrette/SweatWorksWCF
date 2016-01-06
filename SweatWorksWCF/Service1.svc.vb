@@ -2,6 +2,7 @@
 Imports SweatWorksData
 Imports SweatWorksData.ErrorLogging
 Imports System.Data.Entity.Core.Objects
+Imports SweatWorksWCF.Helpers
 
 Public Class Service1
     Implements IService1
@@ -21,7 +22,7 @@ Public Class Service1
 
         'validate
         If thisRequest.Email = Nothing Or (thisRequest.Password = Nothing And thisRequest.FacebookID = Nothing) Then
-            LogError("LoginV1 validation Error, thisRequest: " + thisRequest.toString, intAppID, Now)
+            LogError("Login validation Error, thisRequest: " + thisRequest.toString, intAppID, Now)
             status = Net.HttpStatusCode.BadRequest
             Return New dcUserResponse With {.Status = New dcOperationStatus With {.ErrorMessageForUser = "You didn't supply the correct parameters.", .Successful = False}}
         End If
@@ -43,7 +44,9 @@ Public Class Service1
                             End Try
                             'success
                             Dim thisDCUser As New dcUserResponse(thisUser)
-                            thisDCUser.CompanyName = thisUser.Company.CompanyName
+                            If Not thisUser.Company Is Nothing Then
+                                thisDCUser.CompanyName = thisUser.Company.CompanyName
+                            End If
                             Return thisDCUser
                         Else
                             status = Net.HttpStatusCode.BadRequest
@@ -192,6 +195,8 @@ Public Class Service1
                     existingUser.PasswordHash = HashTools.CreateHash(strNewPassword)
                     existingUser.IsTempPassword = True
                     db.SaveChanges()
+                    Notify.SendEmail("smtp.sendgrid.net", "azure_321a635462b90efaff746c3214d6ba1e@azure.com", "Synapse1", "support@sweatquest.com", existingUser.Email,
+                                     "Account support from SweatWorks", BuildNewPasswordMessage(strNewPassword))
                 End If
 
                 db.SaveChanges()
@@ -263,6 +268,12 @@ Public Class Service1
         Return objRandom.Next(Low, High + 1)
     End Function
 
+    Public Shared Function BuildNewPasswordMessage(ByVal strNewPassword As String) As String
+        Dim sbMessage As New StringBuilder
+        sbMessage.Append("A password reset was requested through the SweatWorks system.  If you did not create this request, email support at <a href=""emailto:support@SweatQuest.com"">support@sweatquest.com</a><br><br>")
+        sbMessage.Append("Your temporary password is <b>" + strNewPassword + "</b>")
+        Return sbMessage.ToString
+    End Function
 
 #End Region
 
@@ -319,7 +330,7 @@ Public Class Service1
                             End If
                         Next
                     End If
-                    
+
                 ElseIf Not thisRequest.City = Nothing And Not thisRequest.State = Nothing Then
                     'city/state
                     gyms = (From g In db.Gyms Where g.City = thisRequest.City And g.State = thisRequest.State And g.DateDeleted Is Nothing And g.GymAmenitys.Count > 0).ToList
@@ -339,18 +350,18 @@ Public Class Service1
 
                 'sort gyms by preferences if they exist?
                 If Not thisRequest.UserID = Nothing Then
-                    gyms = (From g In gyms Where g.DateDeleted Is Nothing _
-                        Order By If((From ga In g.GymAmenitys _
-                        Join upa In db.UserPrefAmenitys On ga.AmenityID Equals upa.AmenityID _
-                        Where upa.UserID = thisRequest.UserID _
-                        Order By upa.Rank _
-                        Select CType(upa.Rank, Integer?)).FirstOrDefault, 11), _
-                        If((From ga In g.GymClasses _
-                        Join upc In db.UserPrefClassCategorys On ga.GymClassCategoryID Equals upc.GymClassCategory.GymClassCategoryID _
-                        Where upc.UserID = thisRequest.UserID _
-                        Select CType(upc.ClassCategoryID, Integer?)).FirstOrDefault, 0) Descending).Take(50).ToList
+                    gyms = (From g In gyms Where g.DateDeleted Is Nothing
+                            Order By If((From ga In g.GymAmenitys
+                                         Join upa In db.UserPrefAmenitys On ga.AmenityID Equals upa.AmenityID
+                                         Where upa.UserID = thisRequest.UserID
+                                         Order By upa.Rank
+                                         Select CType(upa.Rank, Integer?)).FirstOrDefault, 11),
+                        If((From ga In g.GymClasses
+                            Join upc In db.UserPrefClassCategorys On ga.GymClassCategoryID Equals upc.GymClassCategory.GymClassCategoryID
+                            Where upc.UserID = thisRequest.UserID
+                            Select CType(upc.ClassCategoryID, Integer?)).FirstOrDefault, 0) Descending).Take(50).ToList
 
-                    
+
                 End If
                 If Not gyms Is Nothing Then
                     For Each thisGym As Gym In gyms
@@ -374,7 +385,7 @@ Public Class Service1
     End Function
 
     Public Function GetAllCityStates() As List(Of String) Implements IService1.GetAllCityStates
-      Dim ctx As WebOperationContext = WebOperationContext.Current
+        Dim ctx As WebOperationContext = WebOperationContext.Current
         Dim status As System.Net.HttpStatusCode = System.Net.HttpStatusCode.OK
         Dim thisResponse As New dcGymDetailsResponse
 
@@ -454,7 +465,7 @@ Public Class Service1
                 Dim thisUser As User = (From u In db.Users Where u.UserID = intUserID).FirstOrDefault
                 If Not thisUser Is Nothing Then
                     'favorite gyms
-                    Dim results = (From checkins In thisUser.Checkins Group checkins.Gym By checkins.Gym Into favgyms = Group Order By favgyms.Count Descending Select New With {favgyms.Count, Gym.Name, Gym.GymID}).take(3).tolist
+                    Dim results = (From checkins In thisUser.Checkins Group checkins.Gym By checkins.Gym Into favgyms = Group Order By favgyms.Count Descending Select New With {favgyms.Count, Gym.Name, Gym.GymID}).Take(3).ToList
                     For Each thisResult In results
                         thisResponse.Favorites.Add(New dcGymListing With {.Name = thisResult.Name, .GymID = thisResult.GymID})
                     Next

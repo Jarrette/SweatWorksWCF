@@ -14,6 +14,7 @@ Namespace DataContracts
         Private _Status As dcOperationStatus
         Private _CompanyID As Integer
         Private _CompanyName As String
+        Private _IsTempPassword As Boolean
 
         <DataMember(IsRequired:=True)>
         Public Property UserID() As Integer
@@ -105,6 +106,16 @@ Namespace DataContracts
             End Set
         End Property
 
+        <DataMember(IsRequired:=False)>
+        Public Property IsTempPassword() As Boolean
+            Get
+                Return _IsTempPassword
+            End Get
+            Set(ByVal value As Boolean)
+                _IsTempPassword = value
+            End Set
+        End Property
+
         Public Sub New()
         End Sub
 
@@ -116,7 +127,12 @@ Namespace DataContracts
             _LastName = thisUser.LastName
             _UserImageURL = thisUser.UserImageURL
             _Status = New dcOperationStatus With {.Successful = True, .IdentityID = thisUser.UserID.ToString}
-            _CompanyID = thisUser.CompanyID
+            If Not thisUser.CompanyID Is Nothing Then
+                _CompanyID = thisUser.CompanyID
+            End If
+            If Not thisUser.IsTempPassword Is Nothing Then
+                _IsTempPassword = thisUser.IsTempPassword
+            End If
         End Sub
     End Class
 

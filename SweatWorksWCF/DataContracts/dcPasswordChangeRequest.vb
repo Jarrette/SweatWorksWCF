@@ -6,7 +6,7 @@ Namespace DataContracts
     <DataContract(Name:="dcPasswordChangeRequest")>
     Public Class dcPasswordChangeRequest
         Private _UserID As Integer
-        Private _OldPassword As Integer
+        Private _OldPassword As String
         Private _NewPassword As String
 
         <DataMember(IsRequired:=True)>
@@ -20,11 +20,11 @@ Namespace DataContracts
         End Property
 
         <DataMember(IsRequired:=True)>
-        Public Property OldPassword() As Integer
+        Public Property OldPassword() As String
             Get
                 Return _OldPassword
             End Get
-            Set(ByVal value As Integer)
+            Set(ByVal value As String)
                 _OldPassword = value
             End Set
         End Property
