@@ -9,10 +9,6 @@ Namespace DataContracts
         Private _LastName As String
         Private _Email As String
         Private _Password As String
-        Private _FacebookID As String
-        Private _CheckedTerms As String
-        Private _CheckedConsent As String
-        Private _OptedIn As String
         Private _EmployerCode As String
 
         <DataMember(IsRequired:=True)>
@@ -52,46 +48,6 @@ Namespace DataContracts
             End Get
             Set(ByVal value As String)
                 _Password = value
-            End Set
-        End Property
-
-        <DataMember(IsRequired:=False)>
-        Public Property FacebookID() As String
-            Get
-                Return _FacebookID
-            End Get
-            Set(ByVal value As String)
-                _FacebookID = value
-            End Set
-        End Property
-
-        <DataMember(IsRequired:=False)>
-        Public Property CheckedTerms() As Boolean
-            Get
-                Return _CheckedTerms
-            End Get
-            Set(ByVal value As Boolean)
-                _CheckedTerms = value
-            End Set
-        End Property
-
-        <DataMember(IsRequired:=False)>
-        Public Property CheckedConsent() As Boolean
-            Get
-                Return _CheckedConsent
-            End Get
-            Set(ByVal value As Boolean)
-                _CheckedConsent = value
-            End Set
-        End Property
-
-        <DataMember(IsRequired:=False)>
-        Public Property OptedIn() As Boolean
-            Get
-                Return _OptedIn
-            End Get
-            Set(ByVal value As Boolean)
-                _OptedIn = value
             End Set
         End Property
 

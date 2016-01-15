@@ -32,7 +32,7 @@ Public Class Service1
                 Dim thisUser As User = (From u In db.Users Where u.Email = strEmail).FirstOrDefault
 
                 If Not thisUser Is Nothing Then
-
+                    'USER EXISTS
                     If Not thisUser.PasswordHash Is Nothing And Not thisUser.PasswordHash = "none" Then
                         If HashTools.ValidatePassword(strPassword, thisUser.PasswordHash) Then
                             Try
@@ -53,14 +53,37 @@ Public Class Service1
                             LogError("Login Error: wrong password.  strEmail: " + strEmail + " strPassword: " + strPassword, intAppID, Now)
                             Return New dcUserResponse With {.Status = New dcOperationStatus With {.Notes = "wrong password", .ErrorMessageForUser = "There is not a user account associated with this email and/or password.", .Successful = False}}
                         End If
+                    ElseIf thisRequest.FacebookID = thisUser.FacebookID Then
+                        'SUCCESSFUL FACEBOOK LOGIN (existing user)
+                        'log user activity
+                        db.UserActivitys.Add(New UserActivity With {.AppID = intAppID, .UserID = thisUser.UserID, .DateRecorded = Now, .UserActivityTypeID = 1})
+                        db.SaveChanges()
+                        'success
+                        Dim thisDCUser As New dcUserResponse(thisUser)
+                        If Not thisUser.Company Is Nothing Then
+                            thisDCUser.CompanyName = thisUser.Company.CompanyName
+                        End If
+                        Return thisDCUser
                     Else
                         status = Net.HttpStatusCode.BadRequest
                         LogError("Login Error: user has no password.  strEmail: " + strEmail + " strPassword: " + strPassword, intAppID, Now)
                         Return New dcUserResponse With {.Status = New dcOperationStatus With {.ErrorMessageForUser = "There is not a user account associated with this email and/or password.", .Notes = "user has no password", .Successful = False}}
                     End If
-
                 Else
-                    'no user found
+                    'USER DOESNT EXIST
+                    If Not thisRequest.FacebookID = Nothing And Not thisRequest.FirstName = Nothing And Not thisRequest.LastName = Nothing Then
+                        'FACEBOOK LOGIN (Create new user)
+                        Dim newUser As New User With {.FirstName = thisRequest.FirstName, .LastName = thisRequest.LastName, .Email = thisRequest.Email, .FacebookID = thisRequest.FacebookID, .DateCreated = Now, .UserTypeID = 1}
+                        db.Users.Add(newUser)
+                        db.SaveChanges()
+                        status = Net.HttpStatusCode.Created
+                        Return New dcUserResponse(newUser)
+                    Else
+                        'INSUFFICIENT FACEBOOK CREDENTIALS
+                        status = Net.HttpStatusCode.BadRequest
+                        LogError("Login Error: user doesn't exist/failed login.  strEmail: " + strEmail + " strPassword: " + strPassword, intAppID, Now)
+                        Return New dcUserResponse With {.Status = New dcOperationStatus With {.ErrorMessageForUser = "There is not a user account associated with this email and/or password.", .Successful = False}}
+                    End If
                     status = Net.HttpStatusCode.BadRequest
                     LogError("Login Error: user doesn't exist/failed login.  strEmail: " + strEmail + " strPassword: " + strPassword, intAppID, Now)
                     Return New dcUserResponse With {.Status = New dcOperationStatus With {.ErrorMessageForUser = "There is not a user account associated with this email and/or password.", .Successful = False}}
@@ -218,7 +241,7 @@ Public Class Service1
 
         Try
             Using db As New SweatWorksEntities
-                Dim existingUser As User = (From u In db.Users Where u.Email = thisRequest.UserID).FirstOrDefault
+                Dim existingUser As User = (From u In db.Users Where u.UserID = thisRequest.UserID).FirstOrDefault
                 If existingUser Is Nothing Then
                     Return New dcOperationStatus With {.ErrorMessageForUser = "This UserID is not affililated with an existing account.", .Successful = False}
                 Else
@@ -226,6 +249,7 @@ Public Class Service1
                         existingUser.PasswordHash = HashTools.CreateHash(thisRequest.NewPassword)
                         existingUser.IsTempPassword = False
                         db.SaveChanges()
+                        Return New dcOperationStatus With {.Successful = True, .Notes = "Password Changed."}
                     Else
                         status = Net.HttpStatusCode.BadRequest
                         LogError("ChangePassword Error: OldPassword was incorrect", intAppID, Now)
@@ -233,9 +257,6 @@ Public Class Service1
                     End If
 
                 End If
-
-                db.SaveChanges()
-                Return New dcOperationStatus With {.Successful = True, .Notes = "Password Changed."}
             End Using
         Catch ex As Exception
             status = Net.HttpStatusCode.Conflict
